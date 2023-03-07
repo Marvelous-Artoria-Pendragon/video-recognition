@@ -1,0 +1,14 @@
+1 opbb
+2 oprl
+3 opwb
+4 staq
+5 stga
+6 stls
+7 stps
+8 strh
+9 strw
+10 tcaq
+11 tctc
+12 tcwa
+13 tcwb
+14 tsir

@@ -1,0 +1,8 @@
+1 oprl
+2 opwb
+3 stga
+4 stls
+5 stps
+6 strh
+7 strw
+8 tcwb

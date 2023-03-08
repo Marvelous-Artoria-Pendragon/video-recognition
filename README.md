@@ -94,7 +94,7 @@ Note: HMDB dataset's directory tree is similar to UCF101 dataset's. If you want 
 ## Experiments
 (orginal words..) These models were trained in machine with NVIDIA TITAN X 12gb GPU. Note that I splited
 train/val/test data for each dataset using sklearn. If you want to train models using
-official train/val/test data, you can look in [dataset.py](https://github.com/Marvelous-Artoria-Pendragon/pytorch-video-recognition/blob/master/dataloaders/dataset.py), and modify it to your needs.
+official train/val/test data, you can look in [dataset.py](https://github.com/Marvelous-Artoria-Pendragon/pytorch-video-recognition/tree/master/dataloaders/dataset.py), and modify it to your needs.
 
 Currently, I only train C3D model in UCF and HMDB datasets. The train/val/test
 accuracy and loss curves for each experiment are shown below:

@@ -8,19 +8,19 @@
 </table>
 
 ## Introduction
-This repo contains several models for video action recognition,
-including C3D, R2Plus1D, R3D, inplemented using PyTorch (0.4.0).
-Currently, we train these models on UCF101 and HMDB51 datasets.
-**More models and datasets will be available soon!**
+This repo is an updated version from the previews, which contains several models for video action recognition,
+including **C3D**, **R2Plus1D**, **R3D**, **I3D**, inplemented using PyTorch (0.4.0).
+Currently, I train these models on UCF101 and HMDB51 datasets.
+~~**More models and datasets will be available soon!**~~
 
 **Note: An interesting online web game based on C3D model is in [here](https://github.com/jfzhang95/project-demo).**
 
 ## Installation
-The code was tested with Anaconda and Python 3.5. After installing the Anaconda environment:
+The code was tested with Anaconda and Python 3.7. After installing the Anaconda environment:
 
 0. Clone the repo:
     ```Shell
-    git clone https://github.com/jfzhang95/pytorch-video-recognition.git
+    git clone https://github.com/Marvelous-Artoria-Pendragon/pytorch-video-recognition.git
     cd pytorch-video-recognition
     ```
 
@@ -51,7 +51,7 @@ The code was tested with Anaconda and Python 3.5. After installing the Anaconda 
 
 ## Datasets:
 
-I used two different datasets: UCF101 and HMDB.
+There're two different datasets: UCF101 and HMDB.
 
 Dataset directory tree is shown below
 
@@ -89,12 +89,12 @@ After pre-processing, the output dir's structure is as follows:
   │   └── ...
   ```
 
-Note: HMDB dataset's directory tree is similar to UCF101 dataset's.
+Note: HMDB dataset's directory tree is similar to UCF101 dataset's. If you want to use your dataset, please modify the dateset's path on **mypthon.py**
 
 ## Experiments
-These models were trained in machine with NVIDIA TITAN X 12gb GPU. Note that I splited
+(orginal words..) These models were trained in machine with NVIDIA TITAN X 12gb GPU. Note that I splited
 train/val/test data for each dataset using sklearn. If you want to train models using
-official train/val/test data, you can look in [dataset.py](https://github.com/jfzhang95/pytorch-video-recognition/blob/master/dataloaders/dataset.py), and modify it to your needs.
+official train/val/test data, you can look in [dataset.py](https://github.com/Marvelous-Artoria-Pendragon/pytorch-video-recognition/master/dataloaders/dataset.py), and modify it to your needs.
 
 Currently, I only train C3D model in UCF and HMDB datasets. The train/val/test
 accuracy and loss curves for each experiment are shown below:
@@ -107,4 +107,4 @@ accuracy and loss curves for each experiment are shown below:
 
 <p align="center"><img src="assets/hmdb51_results.png" align="center" width=900 height=auto/></p>
 
-Experiments for other models will be updated soon ...
+~~Experiments for other models will be updated soon ...~~

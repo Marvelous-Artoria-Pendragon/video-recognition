@@ -5,8 +5,7 @@ from torch.autograd import Variable
 
 import numpy as np
 
-import os
-import sys
+from math import ceil
 from collections import OrderedDict
 
 
@@ -186,23 +185,27 @@ class InceptionI3d(nn.Module):
         'Predictions',
     )
 
-    def __init__(self, num_classes=400, spatial_squeeze=True,
-                 final_endpoint='Logits', name='inception_i3d', in_channels=3, dropout_keep_prob=0.5):
+    def __init__(self, num_classes=400, spatial_squeeze=True, temporal_squeeze=True,
+                 final_endpoint='Logits', name='inception_i3d', in_channels=3, dropout_keep_prob=0.5, num_frames=16):
         """Initializes I3D model instance.
         Args:
-          num_classes: The number of outputs in the logit layer (default 400, which
-              matches the Kinetics dataset).
-          spatial_squeeze: Whether to squeeze the spatial dimensions for the logits
-              before returning (default True).
-          final_endpoint: The model contains many possible endpoints.
-              `final_endpoint` specifies the last endpoint for the model to be built
-              up to. In addition to the output at `final_endpoint`, all the outputs
-              at endpoints up to `final_endpoint` will also be returned, in a
-              dictionary. `final_endpoint` must be one of
-              InceptionI3d.VALID_ENDPOINTS (default 'Logits').
-          name: A string (optional). The name of this module.
+            num_classes: The number of outputs in the logit layer (default 400, which
+                matches the Kinetics dataset).
+            spatial_squeeze: Whether to squeeze the spatial dimensions for the logits
+                before returning (default True).
+            temporal_squeeze: Whether to squeeze the temporal dimensions for the logits
+                before returning (default True). It doesn't work when spatial_squeeze 
+                is False.
+            final_endpoint: The model contains many possible endpoints.
+              ` final_endpoint` specifies the last endpoint for the model to be built
+                up to. In addition to the output at `final_endpoint`, all the outputs
+                at endpoints up to `final_endpoint` will also be returned, in a
+                dictionary. `final_endpoint` must be one of
+                InceptionI3d.VALID_ENDPOINTS (default 'Logits').
+            name: A string (optional). The name of this module.
+            num_frame: the number of input frames (default 16).
         Raises:
-          ValueError: if `final_endpoint` is not recognized.
+            ValueError: if `final_endpoint` is not recognized.
         """
 
         if final_endpoint not in self.VALID_ENDPOINTS:
@@ -211,6 +214,7 @@ class InceptionI3d(nn.Module):
         super(InceptionI3d, self).__init__()
         self._num_classes = num_classes
         self._spatial_squeeze = spatial_squeeze
+        self._temporal_squeeze = temporal_squeeze
         self._final_endpoint = final_endpoint
         self.logits = None
 
@@ -290,7 +294,9 @@ class InceptionI3d(nn.Module):
         if self._final_endpoint == end_point: return
 
         end_point = 'Logits'
-        self.avg_pool = nn.AvgPool3d(kernel_size=[2, 7, 7],
+        # calculate the kernel_size of avgpool3d on temporal dimension
+        a = ceil(ceil(ceil(num_frames/2)/2)/2)
+        self.avg_pool = nn.AvgPool3d(kernel_size=[a, 7, 7],
                                      stride=(1, 1, 1))
         self.dropout = nn.Dropout(dropout_keep_prob)
         self.logits = Unit3D(in_channels=384+384+128+128, output_channels=self._num_classes,
@@ -326,7 +332,9 @@ class InceptionI3d(nn.Module):
 
         x = self.logits(self.dropout(self.avg_pool(x)))
         if self._spatial_squeeze:
-            logits = x.squeeze(3).squeeze(3).squeeze(2)
+            logits = x.squeeze(3).squeeze(3)
+            if self._temporal_squeeze:
+                logits = logits.squeeze(2)
         # logits is batch X time X classes, which is what we want to work with
         return logits
         

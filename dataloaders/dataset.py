@@ -5,7 +5,7 @@ import torch
 import cv2
 import numpy as np
 from torch.utils.data import Dataset
-from mypath import Path
+# from mypath import Path
 
 
 class VideoDataset(Dataset):
@@ -15,14 +15,23 @@ class VideoDataset(Dataset):
     inferred from the respective folder names.
 
         Args:
-            dataset (str): Name of dataset. Defaults to 'ucf101'.
-            split (str): Determines which folder of the directory the dataset will read from. Defaults to 'train'.
-            clip_len (int): Determines how many frames are there in each clip. Defaults to 16.
-            preprocess (bool): Determines whether to preprocess dataset. Default is False.
+            dataset (str):                  Name of dataset.
+            split (str):                    Determines which folder of the directory the dataset will read from. Defaults to 'train'.
+            clip_len (int):                 Determines how many frames are there in each clip, which must be less than min_split_freq. Defaults to 16.
+            preprocess (bool):              Determines whether to preprocess dataset. Default is False.
+            resize_height (int):            Resize the picture's height. Defaults to 128.
+            resize_height (int):            Resize the picture's width. Defaults to 171.
+            crop_size (int):                The size of random crop.
+            label_path (str):               The diretory of label.
+            test_size (float):              The split size of test data among the whole dataset.
+            val_size (float):               The split size of valid data among the train dataset.
+            min_split_freq (int):           The minimum number of split frames. Default is 24.
     """
 
-    def __init__(self, dataset='ucf101', split='train', clip_len=16, preprocess=False, resize_height = 128, resize_width = 171, crop_size = 112):
-        self.root_dir, self.output_dir = Path.db_dir(dataset)
+    def __init__(self, dataset, split='train', clip_len=16, preprocess=False, resize_height = 128, resize_width = 171, crop_size = 112, 
+                 label_path = './dataloader', root_dir = '.',  output_dir = '.', test_size = 0.2, val_size = 0.2, min_split_freq = 24):
+        self.root_dir = root_dir
+        self.output_dir = output_dir
         folder = os.path.join(self.output_dir, split)
         self.clip_len = clip_len
         self.split = split
@@ -31,6 +40,9 @@ class VideoDataset(Dataset):
         self.resize_height = resize_height
         self.resize_width = resize_width
         self.crop_size = crop_size
+        self.test_size = test_size
+        self.val_size = val_size
+        self.min_split_freq = min_split_freq
 
         if not self.check_integrity():
             print(self.root_dir)
@@ -57,23 +69,11 @@ class VideoDataset(Dataset):
         # Convert the list of label names into an array of label indices
         self.label_array = np.array([self.label2index[label] for label in labels], dtype=int)
 
-        if dataset == "ucf101":
-            if not os.path.exists(Path.ucf_label_dir()):
-                with open(Path.ucf_label_dir(), 'w') as f:
-                    for id, label in enumerate(sorted(self.label2index)):
-                        f.writelines(str(id+1) + ' ' + label + '\n')
-
-        elif dataset == 'hmdb51':
-            if not os.path.exists('dataloaders/hmdb_labels.txt'):
-                with open('dataloaders/hmdb_labels.txt', 'w') as f:
-                    for id, label in enumerate(sorted(self.label2index)):
-                        f.writelines(str(id+1) + ' ' + label + '\n')
-        
-        elif dataset == 'tb':
-            if not os.path.exists(Path.tb_label_dir()):
-                with open(Path.tb_label_dir(), 'w') as f:
-                    for id, label in enumerate(sorted(self.label2index)):
-                        f.writelines(str(id+1) + ' ' + label + '\n')
+        label_filename = os.path.join(label_path, dataset + '_labels.txt')
+        if not os.path.exists(label_filename):
+            with open(label_filename, 'w') as f:
+                for id, label in enumerate(sorted(self.label2index)):
+                    f.writelines(str(id+1) + ' ' + label + '\n')
 
     def __len__(self):
         return len(self.fnames)
@@ -92,10 +92,7 @@ class VideoDataset(Dataset):
         return torch.from_numpy(buffer), torch.from_numpy(labels)
 
     def check_integrity(self):
-        if not os.path.exists(self.root_dir):
-            return False
-        else:
-            return True
+        return os.path.exists(self.root_dir)
 
     def check_preprocess(self):
         # TODO: Check image size in output_dir
@@ -132,8 +129,8 @@ class VideoDataset(Dataset):
             file_path = os.path.join(self.root_dir, file)
             video_files = [name for name in os.listdir(file_path)]
 
-            train_and_valid, test = train_test_split(video_files, test_size=0.2, random_state=42)
-            train, val = train_test_split(train_and_valid, test_size=0.2, random_state=42)
+            train_and_valid, test = train_test_split(video_files, test_size = self.test_size, random_state=42)
+            train, val = train_test_split(train_and_valid, test_size = self.val_size, random_state=42)
 
             train_dir = os.path.join(self.output_dir, 'train', file)
             val_dir = os.path.join(self.output_dir, 'val', file)
@@ -170,18 +167,11 @@ class VideoDataset(Dataset):
         frame_width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-        #print('processing \"{}\", frames: {}'.format(video_filename, (frame_count, frame_width, frame_height)))
-        # Make sure splited video has at least 16 frames
         EXTRACT_FREQUENCY = 4
-        if frame_count // EXTRACT_FREQUENCY <= 16:
+        while (frame_count // EXTRACT_FREQUENCY <= self.min_split_freq and EXTRACT_FREQUENCY > 0):
             EXTRACT_FREQUENCY -= 1
-            if frame_count // EXTRACT_FREQUENCY <= 16:
-                EXTRACT_FREQUENCY -= 1
-                if frame_count // EXTRACT_FREQUENCY <= 16:
-                    EXTRACT_FREQUENCY -= 1
 
-        count = 0
-        i = 0
+        count = 0; L = []; i = 0
         retaining = True
         frame = None
         while (count < frame_count and retaining):
@@ -192,15 +182,16 @@ class VideoDataset(Dataset):
             if count % EXTRACT_FREQUENCY == 0:
                 if (frame_height != self.resize_height) or (frame_width != self.resize_width):
                     frame = cv2.resize(frame, (self.resize_width, self.resize_height))
-                cv2.imwrite(filename=os.path.join(save_dir, video_filename, '0000{}.jpg'.format(str(i))), img=frame)
-                i += 1
+                L.append(frame)
             count += 1
 
-        # when the frames is less than 16, fill out the clips up to 16 with the last frame.
-        if count < 16:
-            for ii in range(16 - count):
-                cv2.imwrite(filename=os.path.join(save_dir, video_filename, '0000{}.jpg'.format(str(i))), img=frame)
-                i += 1
+        # when the frames is less than min_split_freq, loop the video
+        while len(L) < self.min_split_freq:
+            L.append(L[i])
+            i = (i + 1) % count
+
+        for ii in range(len(L)):
+            cv2.imwrite(filename=os.path.join(save_dir, video_filename, '0000{}.jpg'.format(str(ii))), img=L[ii])
 
         # Release the VideoCapture once it is no longer needed
         capture.release()
@@ -254,10 +245,6 @@ class VideoDataset(Dataset):
                  width_index:width_index + crop_size, :]
 
         return buffer
-
-
-
-
 
 if __name__ == "__main__":
     from torch.utils.data import DataLoader

@@ -24,9 +24,9 @@ class_dict = dict({'hmdb51': 51, 'ucf101':101, 'tb':14, 'test':2})
 # save_dir_root = os.path.join(os.path.dirname(os.path.abspath(__file__)))
 exp_name = os.path.dirname(os.path.abspath(__file__)).split('/')[-1]
 
-def train_model(dataset, modelName, n_classes, save_dir = '.', lr = 1e-3, nEpochs = 50, resume_epoch = 0, useTest = True, test_interval = 10, num_frames = 16,
-                resize_height = 128, resize_width = 171, crop_size = 112, batch_size = 12, n_worker = 4, modality = 'rgb', pretrained = False,
-                step_size = 10, gamma = 0.1):
+def train_model(dataset, modelName, n_classes, save_dir = '.', lr = 1e-3, nEpochs = 50, model_dir = None, data_dir = None, label_dir = './dataloader', 
+                resume_epoch = 0, snapshots = 10, useTest = True, test_interval = 10, num_frames = 16, resize_height = 128, resize_width = 171, 
+                crop_size = 112, batch_size = 12, n_worker = 4, modality = 'rgb', pretrained = False, step_size = 10, gamma = 0.1):
     """
     ===========================================================================\n
         Args:
@@ -42,7 +42,7 @@ def train_model(dataset, modelName, n_classes, save_dir = '.', lr = 1e-3, nEpoch
     """
 
     if modelName == 'C3D':
-        model = C3D_model.C3D(num_classes=n_classes, pretrained = pretrained)
+        model = C3D_model.C3D(num_classes=n_classes, pretrained = pretrained, model_path = os.path.join(model_dir, "c3d-pretrained.pth"))
         train_params = [{'params': C3D_model.get_1x_lr_params(model), 'lr': lr},
                         {'params': C3D_model.get_10x_lr_params(model), 'lr': lr * 10}]
     elif modelName == 'R2Plus1D':
@@ -59,11 +59,12 @@ def train_model(dataset, modelName, n_classes, save_dir = '.', lr = 1e-3, nEpoch
         # default rgb mode
         if modality == 'rgb':
             model = I3D_model.InceptionI3d(400, num_frames=num_frames, in_channels=3)
+            pretrained_path = os.path.join(model_dir, "rgb_imagenet.pt")
         else:   # flow
             model = I3D_model.InceptionI3d(400, num_frames=num_frames, in_channels=2)
+            pretrained_path = os.path.join(model_dir, "flow_imagenet.pt")
         if pretrained:
-                model.load_state_dict(torch.load("./model/rgb_imagenet.pt"))
-                model.load_state_dict(torch.load("./model/flow_imagenet.pt"))
+                model.load_state_dict(torch.load(pretrained_path))
         model.replace_logits(n_classes)
         train_params = model.parameters()
     else:
@@ -84,20 +85,20 @@ def train_model(dataset, modelName, n_classes, save_dir = '.', lr = 1e-3, nEpoch
         optimizer.load_state_dict(checkpoint['opt_dict'])
 
     print('Total params: %.2fM' % (sum(p.numel() for p in model.parameters()) / 1000000.0))
+    # if modelName == 'I3D':
+    model = nn.DataParallel(model)
     model.to(device)
     criterion.to(device)
-    if modelName == 'I3D':
-        model = nn.DataParallel(model)
 
     log_dir = os.path.join(save_dir, 'models', datetime.now().strftime('%b%d_%H-%M-%S') + '_' + socket.gethostname())
     writer = SummaryWriter(log_dir=log_dir)
 
-    train_dataloader = DataLoader(VideoDataset(dataset=dataset, split='train',clip_len=num_frames, resize_height = resize_height, resize_width = resize_width, 
-                                               crop_size = crop_size), batch_size = batch_size, shuffle=True, num_workers=n_worker)
-    val_dataloader   = DataLoader(VideoDataset(dataset=dataset, split='val',  clip_len=num_frames, resize_height = resize_height, resize_width = resize_width, 
-                                               crop_size = crop_size), batch_size = batch_size, num_workers=n_worker)
-    test_dataloader  = DataLoader(VideoDataset(dataset=dataset, split='test', clip_len=num_frames, resize_height = resize_height, resize_width = resize_width, 
-                                               crop_size = crop_size), batch_size = batch_size, num_workers=n_worker)
+    train_dataloader = DataLoader(VideoDataset(dataset=dataset, split='train',clip_len=num_frames, resize_height = resize_height, resize_width = resize_width, crop_size = crop_size, 
+                                               label_dir = label_dir, root_dir = data_dir, output_dir = save_dir), batch_size = batch_size, shuffle=True, num_workers=n_worker)
+    val_dataloader   = DataLoader(VideoDataset(dataset=dataset, split='val',  clip_len=num_frames, resize_height = resize_height, resize_width = resize_width, crop_size = crop_size, 
+                                               label_dir = label_dir, root_dir = data_dir, output_dir = save_dir), batch_size = batch_size, num_workers=n_worker)
+    test_dataloader  = DataLoader(VideoDataset(dataset=dataset, split='test', clip_len=num_frames, resize_height = resize_height, resize_width = resize_width, crop_size = crop_size, 
+                                               label_dir = label_dir, root_dir = data_dir, output_dir = save_dir), batch_size = batch_size, num_workers=n_worker)
 
     trainval_loaders = {'train': train_dataloader, 'val': val_dataloader}
     trainval_sizes = {x: len(trainval_loaders[x].dataset) for x in ['train', 'val']}
@@ -160,7 +161,7 @@ def train_model(dataset, modelName, n_classes, save_dir = '.', lr = 1e-3, nEpoch
         # scheduler.step() is to be called once every epoch during training
         scheduler.step()
 
-        if epoch % nEpochs == (nEpochs - 1):
+        if epoch % snapshots == (snapshots - 1):
             if modelName == 'I3D':
                 torch.save({
                     'epoch': epoch + 1,
@@ -233,7 +234,9 @@ if __name__ == "__main__":
     parser.add_argument('--n_frame',                type = int, default = 16, help = "Number of the frames of each clip. Default 16.")
     parser.add_argument('--dataset',                type = str, default = "ucf101", help = "The name of dataset (hmd51, ucf101), other dataset please modify mypath.py. Default ucf101.")
     parser.add_argument('--data_dir',               type = str, default = ".", help = "The path of the dataset.")
-    parser.add_argument('--save_dir',               type = str, default = ".", help = "The path save the output. Default is current diretory.")
+    parser.add_argument('--save_dir',               type = str, default = ".", help = "The path to save the output. Default is current diretory.")
+    parser.add_argument('--model_dir',              type = str, default = ".", help = "The path of pretrained model. Default is current diretory.")
+    parser.add_argument('--label_dir',              type = str, default = "./dataloader", help = "The path of labels. Defaul is ./dataloader .")
     parser.add_argument('--n_class',                type = int, default = 0, help = "The number of class.")
     parser.add_argument('--height',                 type = int, default = 128, help = "The resize height of video. Default 128.")
     parser.add_argument('--width',                  type = int, default = 171, help = "The resize width of video. Default 172.")
@@ -291,20 +294,24 @@ if __name__ == "__main__":
                                 save_name = saveName)
     else:
         if args.resume_epoch != 0:
-            runs = sorted(glob.glob(os.path.join(args.save_dir_root, 'run', 'run_*')))
+            runs = sorted(glob.glob(os.path.join(args.save_dir, 'run', 'run_*')))
             run_id = int(runs[-1].split('_')[-1]) if runs else 0
         else:
-            runs = sorted(glob.glob(os.path.join(args.save_dir_root, 'run', 'run_*')))
+            runs = sorted(glob.glob(os.path.join(args.save_dir, 'run', 'run_*')))
             run_id = int(runs[-1].split('_')[-1]) + 1 if runs else 0
 
         save_dir = os.path.join(args.save_dir, 'run', 'run_' + str(run_id))
         train_model(dataset = args.dataset,
                     modelName = args.model,
                     n_classes = n_classes,
-                    save_dir = save_dir,
+                    save_dir = args.save_dir,
                     lr = args.lr,
                     nEpochs = args.epoch,
-                    resume_epoch = args.snapshot,
+                    model_dir = args.model_dir,
+                    data_dir = args.data_dir,
+                    label_dir = args.label_dir,
+                    resume_epoch = args.resume_epoch,
+                    snapshots = args.snapshot,
                     useTest = args.useTest,
                     test_interval = args.nTestInterval,
                     num_frames = args.n_frame,

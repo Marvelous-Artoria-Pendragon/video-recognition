@@ -29,12 +29,13 @@ class VideoDataset(Dataset):
     """
 
     def __init__(self, dataset, split='train', clip_len=16, preprocess=False, resize_height = 128, resize_width = 171, crop_size = 112, 
-                 label_path = './dataloader', root_dir = '.',  output_dir = '.', test_size = 0.2, val_size = 0.2, min_split_freq = 24):
+                 label_dir = './dataloader',  root_dir = '.', output_dir = '.', test_size = 0.2, val_size = 0.2, min_frames = 24, norm = 'minus'):
         self.root_dir = root_dir
         self.output_dir = output_dir
         folder = os.path.join(self.output_dir, split)
         self.clip_len = clip_len
         self.split = split
+        self.norm = norm
 
         # The following three parameters are chosen as described in the paper section 4.1
         self.resize_height = resize_height
@@ -42,7 +43,7 @@ class VideoDataset(Dataset):
         self.crop_size = crop_size
         self.test_size = test_size
         self.val_size = val_size
-        self.min_split_freq = min_split_freq
+        self.min_frames = min_frames
 
         if not self.check_integrity():
             print(self.root_dir)
@@ -69,7 +70,7 @@ class VideoDataset(Dataset):
         # Convert the list of label names into an array of label indices
         self.label_array = np.array([self.label2index[label] for label in labels], dtype=int)
 
-        label_filename = os.path.join(label_path, dataset + '_labels.txt')
+        label_filename = os.path.join(label_dir, dataset + '_labels.txt')
         if not os.path.exists(label_filename):
             with open(label_filename, 'w') as f:
                 for id, label in enumerate(sorted(self.label2index)):
@@ -138,11 +139,11 @@ class VideoDataset(Dataset):
 
             print(train_dir)
             if not os.path.exists(train_dir):
-                os.mkdir(train_dir)
+                os.makedirs(train_dir)
             if not os.path.exists(val_dir):
-                os.mkdir(val_dir)
+                os.makedirs(val_dir)
             if not os.path.exists(test_dir):
-                os.mkdir(test_dir)
+                os.makedirs(test_dir)
 
             for video in train:
                 self.process_video(video, file, train_dir)
@@ -167,8 +168,9 @@ class VideoDataset(Dataset):
         frame_width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
         frame_height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
+        # extract frame equidistantly
         EXTRACT_FREQUENCY = 4
-        while (frame_count // EXTRACT_FREQUENCY <= self.min_split_freq and EXTRACT_FREQUENCY > 0):
+        while (EXTRACT_FREQUENCY > 1 and frame_count // EXTRACT_FREQUENCY <= self.min_frames):
             EXTRACT_FREQUENCY -= 1
 
         count = 0; L = []; i = 0
@@ -185,8 +187,8 @@ class VideoDataset(Dataset):
                 L.append(frame)
             count += 1
 
-        # when the frames is less than min_split_freq, loop the video
-        while len(L) < self.min_split_freq:
+        # when the frames is less than min_frames, loop the video
+        while len(L) < self.min_frames:
             L.append(L[i])
             i = (i + 1) % count
 
@@ -208,9 +210,13 @@ class VideoDataset(Dataset):
 
 
     def normalize(self, buffer):
+        norms = {'minus': lambda x: (x/255.0) * 2 - 1, 'fix': lambda x: x - np.array([[[90.0, 98.0, 102.0]]]),
+                 'mm': lambda x: (x-np.min(x) / (np.max(x)-np.min(x))), 'z-score': lambda x: (x-np.mean(x)) / (np.sqrt((np.sum(x-np.mean(x)**2))/(x.shape[0] * x.shape[1]))),
+                 'log': lambda x: np.log10(x) / np.log10(np.max(x)), 'atan': lambda x: np.arctan(x)*(2/np.pi)}
         for i, frame in enumerate(buffer):
             # frame -= np.array([[[90.0, 98.0, 102.0]]])  # the method mentioned in C3D source code
-            frame = (frame/255.0) * 2 - 1
+            # frame = (frame/255.0) * 2 - 1
+            frame = norms[self.norm](frame)
             buffer[i] = frame
 
         return buffer

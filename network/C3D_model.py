@@ -7,7 +7,7 @@ class C3D(nn.Module):
     The C3D network.
     """
 
-    def __init__(self, num_classes, pretrained=False):
+    def __init__(self, num_classes, pretrained=False, model_path = None):
         super(C3D, self).__init__()
 
         self.conv1 = nn.Conv3d(3, 64, kernel_size=(3, 3, 3), padding=(1, 1, 1))
@@ -38,10 +38,9 @@ class C3D(nn.Module):
         self.__init_weight()
 
         if pretrained:
-            self.__load_pretrained_weights()
+            self.__load_pretrained_weights(model_path)
 
     def forward(self, x):
-
         x = self.relu(self.conv1(x))
         x = self.pool1(x)
 
@@ -69,7 +68,10 @@ class C3D(nn.Module):
         logits = self.fc8(x)
         return logits
 
-    def __load_pretrained_weights(self):
+    def extract_features(self, x):
+        return self.forward(x)
+
+    def __load_pretrained_weights(self, model_path):
         """Initialiaze network."""
         corresp_name = {
                         # Conv1
@@ -104,7 +106,7 @@ class C3D(nn.Module):
                         "classifier.3.bias": "fc7.bias",
                         }
 
-        p_dict = torch.load(Path.model_dir())
+        p_dict = torch.load(model_path)
         s_dict = self.state_dict()
         for name in p_dict:
             if name not in corresp_name:

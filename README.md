@@ -8,52 +8,63 @@
 </table>
 
 ## Introduction
-This repo contains several models for video action recognition,
-including C3D, R2Plus1D, R3D, inplemented using PyTorch (0.4.0).
-Currently, we train these models on UCF101 and HMDB51 datasets.
-**More models and datasets will be available soon!**
-
-**Note: An interesting online web game based on C3D model is in [here](https://github.com/jfzhang95/project-demo).**
+该项目在项目https://github.com/jfzhang95/pytorch-video-recognition.git上做了一定修改，集合了视频行为识别的几种模型，包括C3D, R(2+1)D, R3D(效果不太好), Resnet, I3D, GBDT和XGBoost(分类器)，并基于PyTorch 1.10.0及以上版本运行
 
 ## Installation
-The code was tested with Anaconda and Python 3.5. After installing the Anaconda environment:
+代码在Anaconda和Python 3.6 及以上版本运行。在配置完 Anaconda 环境后：
 
-0. Clone the repo:
+
+1. 克隆项目:
     ```Shell
-    git clone https://github.com/jfzhang95/pytorch-video-recognition.git
+    git clone https://github.com/Marvelous-Artoria-Pendragon/video-recognition.git
     cd pytorch-video-recognition
     ```
 
-1. Install dependencies:
+2. 安装依赖库:
 
     For PyTorch dependency, see [pytorch.org](https://pytorch.org/) for more details.
 
     For custom dependencies:
     ```Shell
-    conda install opencv
+    pip install opencv-python==3.4.2.17
     pip install tqdm scikit-learn tensorboardX
+    pip install argparse
+    pip install joblib
     ```
 
-2. Download pretrained model from [BaiduYun](https://pan.baidu.com/s/1saNqGBkzZHwZpG-A5RDLVw) or 
-[GoogleDrive](https://drive.google.com/file/d/19NWziHWh1LgCcHU34geoKwYezAogv9fX/view?usp=sharing).
-   Currently only support pretrained model for C3D.
+3. 如有需求，自行下载C3D预训练模型(c3d-pretrained.pth)、I3D预训练模型(flow_charades.pt, flow_imagenet.pt, rgb_charades.pt, rgb_imagenet.pt)
 
-3. Configure your dataset and pretrained model path in
-[mypath.py](https://github.com/jfzhang95/pytorch-video-recognition/blob/master/mypath.py).
+4. 到这里，原项目需要配置mypath指定文件路径，本项目设定命令行传参运行，免去每次修改参数的麻烦。这里提供了CIBR-14的部分数据集 CIBR-2 供测试训练：
 
-4. You can choose different models and datasets in
-[train.py](https://github.com/jfzhang95/pytorch-video-recognition/blob/master/train.py).
-
-    To train the model, please do:
+    训练一个I3D模型，在命令行输入:
     ```Shell
-    python train.py
+    python train.py --model I3D --epoch 5 --useTest --nTestInterval 5 --snapshot 5 --lr 1e-3 --n_frame 16 --dataset tb --data_dir ./CIBR-2 --save_dir ./out --label_dir ./dataloaders --n_class 2 --height 226 --width 226 --crop_size 224 --batch_size 1 --n_worker 0
     ```
+
+    使用I3D提取特征(目前只支持)：
+    ```Shell
+    python extract_feature.py --dataset tb --n_class 2 --model_path ./out/models/I3D-tb_epoch-4.pth.tar --data_path ./CIBR-2 --num_frame 16 --save_dir ./out --batch_size 1 --height 226 --width 226 --crop_size 224
+    ```
+    
+    对视频进行分类预测：
+    ```Shell
+    python inference.py --model I3D --n_class 2 --check_point ./out/models/I3D-tb_epoch-4.pth.tar --label_path ./dataloaders/tb_labels.txt --video_dir ./CIBR-2/opbb --output_dir ./out  --n_frame 16
+    ```
+
+5. 其它说明：
+    获取参数说明, 如：
+    ```Shell
+    python train.py -h
+    python extract_feature.py -h
+    python inference.py -h
+    ```
+  
 
 ## Datasets:
 
-I used two different datasets: UCF101 and HMDB.
+项目中我使用了自己的数据集CIBR-14训练，当然也可以使用UCF101和HMD51
 
-Dataset directory tree is shown below
+数据集文件结构样例如下：
 
 - **UCF101**
 Make sure to put the files as the following structure:
@@ -92,19 +103,9 @@ After pre-processing, the output dir's structure is as follows:
 Note: HMDB dataset's directory tree is similar to UCF101 dataset's.
 
 ## Experiments
-These models were trained in machine with NVIDIA TITAN X 12gb GPU. Note that I splited
-train/val/test data for each dataset using sklearn. If you want to train models using
-official train/val/test data, you can look in [dataset.py](https://github.com/jfzhang95/pytorch-video-recognition/blob/master/dataloaders/dataset.py), and modify it to your needs.
+CIBR-14数据集是在Kaggle上训练的，配置为：
+    CPU：双核的Intel(R) Xeon(R) CPU @ 2.00GHz 13GB
+    GPU: 两块Tesla T4 14.8GB
 
-Currently, I only train C3D model in UCF and HMDB datasets. The train/val/test
-accuracy and loss curves for each experiment are shown below:
+若机器硬件不行，请适当降低参数batch_size大小
 
-- **UCF101**
-
-<p align="center"><img src="assets/ucf101_results.png" align="center" width=900 height=auto/></p>
-
-- **HMDB51**
-
-<p align="center"><img src="assets/hmdb51_results.png" align="center" width=900 height=auto/></p>
-
-Experiments for other models will be updated soon ...

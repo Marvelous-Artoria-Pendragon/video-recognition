@@ -8,7 +8,7 @@
 </table>
 
 ## Introduction
-该项目在项目https://github.com/jfzhang95/pytorch-video-recognition.git上做了一定修改，集合了视频行为识别的几种模型，包括C3D, R(2+1)D, R3D(效果不太好), Resnet, I3D, GBDT和XGBoost(分类器)，并基于PyTorch 1.10.0及以上版本运行
+该项目在项目 https://github.com/jfzhang95/pytorch-video-recognition.git 上做了一定修改，集合了视频行为识别的几种模型，包括C3D, R(2+1)D, R3D(效果不太好), Resnet, I3D, GBDT和XGBoost(分类器)，并基于PyTorch 1.10.0及以上版本运行
 
 ## Installation
 代码在Anaconda和Python 3.6 及以上版本运行。在配置完 Anaconda 环境后：
@@ -103,7 +103,8 @@ After pre-processing, the output dir's structure is as follows:
 Note: HMDB dataset's directory tree is similar to UCF101 dataset's.
 
 ## Experiments
-CIBR-14数据集是在Kaggle上训练的，配置为：
+CIBR-14数据集是在Kaggle上训练的，配置为: 
+    
     CPU：双核的Intel(R) Xeon(R) CPU @ 2.00GHz 13GB
     GPU: 两块Tesla T4 14.8GB
 

@@ -104,9 +104,9 @@ Note: HMDB dataset's directory tree is similar to UCF101 dataset's.
 
 ## Experiments
 CIBR-14数据集是在Kaggle上训练的，配置为: 
-    
-    CPU：双核的Intel(R) Xeon(R) CPU @ 2.00GHz 13GB
-    GPU: 两块Tesla T4 14.8GB
-
+  ```
+  CPU：双核的Intel(R) Xeon(R) CPU @ 2.00GHz 13GB
+  GPU: 两块Tesla T4 14.8GB
+  ```
 若机器硬件不行，请适当降低参数batch_size大小
 
